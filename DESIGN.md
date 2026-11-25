@@ -89,8 +89,9 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 - **Metrics**: `/actuator/metrics` has the standard HTTP metrics (rate, errors, latency) and a business
   counter `payments.processed` tagged by outcome: `authorized`, `declined`, `rejected`, `bank_unavailable`.
 - **Logs never contain card data**: a rejected request logs only the names of the invalid fields.
-- **Not done**: distributed tracing, a metrics backend (Prometheus) and alerts. In production I would alert
-  on the `bank_unavailable` rate and on p99 latency.
+- **Not done**: distributed tracing, a metrics backend (Prometheus) and alerts.
+  In production I would add metrics for the bank call (latency, timeouts, errors) and JVM resources, and alert on
+  the `bank_unavailable` rate, p99 latency, the 5xx rate and sudden changes in the decline rate.
 
 ## Packaging and hosting
 
@@ -123,7 +124,7 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 | **Stolen API keys** | A leaked key can create payments | HTTPS only, never log keys, scopes, IP allow-list, per-key limits, expiry, usage monitoring, instant revoke. For stronger security, request signing (HMAC) so the secret is never sent |
 | **Card data at rest** | A database leak would expose card data (PCI scope) | Keep only the last four digits. If full numbers are ever needed, use a separate PCI-compliant vault and give the gateway a token |
 | **Secrets** | The bank URL is in `application.properties`, and later there will be credentials | Load secrets from a secret manager or environment variables, never from Git |
-| **Logging and monitoring** | No automated check that logs stay free of card data, no request id, no alerts | A test that fails if a card number appears in logs, a request id on every log line, alerts on bank error rate |
+| **Logging and monitoring** | Every log line has a request id and logs hold no card data, but nobody is alerted when something goes wrong | Send metrics to a monitoring system and alert on bank error rate, latency, 5xx rate and sudden changes in the decline rate |
 | **Swagger UI** | It shows the API to everyone | Disable it in production or keep it on the internal network |
 | **Dependencies** | A library with a known vulnerability | Dependency scan in CI |
 

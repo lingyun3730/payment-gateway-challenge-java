@@ -56,8 +56,8 @@ public class OpenApiConfiguration {
     examples.put("5. Rejected: fields missing (422)", load(objectMapper, "5-missing-fields.json"));
     examples.put("6. Rejected: card expired (422)", load(objectMapper, "6-expired-card.json"));
     examples.put("7. Malformed JSON (400)", load(objectMapper, "7-malformed-json.json"));
-    examples.put("8. Amount is not an integer (400)",
-        load(objectMapper, "8-amount-not-integer.json"));
+    examples.put("8. Rejected: amount is not a whole number (422)",
+        load(objectMapper, "8-amount-not-whole-number.json"));
     return examples;
   }
 

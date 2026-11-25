@@ -2,6 +2,7 @@ package com.checkout.payment.gateway.validation;
 
 import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.RejectedResponse.FieldError;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -93,11 +94,22 @@ public class PaymentValidator {
     }
   }
 
-  private void checkAmount(Long amount, List<FieldError> errors) {
+  private void checkAmount(BigDecimal amount, List<FieldError> errors) {
     if (amount == null) {
       errors.add(required("amount"));
-    } else if (amount <= 0) {
+    } else if (!isWholeNumberInLongRange(amount)) {
+      errors.add(new FieldError("amount", "must be a whole number in the minor currency unit"));
+    } else if (amount.signum() <= 0) {
       errors.add(new FieldError("amount", "must be greater than 0 in the minor currency unit"));
+    }
+  }
+
+  private static boolean isWholeNumberInLongRange(BigDecimal amount) {
+    try {
+      amount.longValueExact();
+      return true;
+    } catch (ArithmeticException e) {
+      return false;
     }
   }
 

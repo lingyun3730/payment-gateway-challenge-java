@@ -14,7 +14,7 @@ public record BankRequest(
   public static BankRequest from(PostPaymentRequest request) {
     String expiryDate = String.format("%02d/%d", request.expiryMonth(), request.expiryYear());
     return new BankRequest(request.cardNumber(), expiryDate, request.currency(),
-        request.amount(), request.cvv());
+        request.amount().longValueExact(), request.cvv());
   }
 
   // Never print the card number or CVV.

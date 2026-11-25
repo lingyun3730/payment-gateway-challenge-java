@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.RejectedResponse.FieldError;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -22,12 +23,12 @@ class PaymentValidatorTest {
   private final PaymentValidator validator = new PaymentValidator(CLOCK);
 
   private static PostPaymentRequest request(String cardNumber, Integer month, Integer year,
-      String currency, Long amount, String cvv) {
+      String currency, BigDecimal amount, String cvv) {
     return new PostPaymentRequest(cardNumber, month, year, currency, amount, cvv);
   }
 
   private static PostPaymentRequest validRequest() {
-    return request("2222405343248877", 4, 2030, "GBP", 100L, "123");
+    return request("2222405343248877", 4, 2030, "GBP", BigDecimal.valueOf(100), "123");
   }
 
   private static List<String> failedFields(List<FieldError> errors) {
@@ -53,7 +54,7 @@ class PaymentValidatorTest {
   @ValueSource(strings = {"1234567890123", "12345678901234567890", "2222abcd43248877",
       "2222 4053 4324 8877", ""})
   void invalidCardNumberIsRejected(String cardNumber) {
-    PostPaymentRequest request = request(cardNumber, 4, 2030, "GBP", 100L, "123");
+    PostPaymentRequest request = request(cardNumber, 4, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("cardNumber");
   }
@@ -61,7 +62,7 @@ class PaymentValidatorTest {
   @ParameterizedTest
   @ValueSource(strings = {"12345678901234", "1234567890123456789"})
   void cardNumberLengthBoundariesAreAccepted(String cardNumber) {
-    PostPaymentRequest request = request(cardNumber, 4, 2030, "GBP", 100L, "123");
+    PostPaymentRequest request = request(cardNumber, 4, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(validator.validate(request)).isEmpty();
   }
@@ -69,35 +70,35 @@ class PaymentValidatorTest {
   @ParameterizedTest
   @ValueSource(ints = {0, 13, -1})
   void invalidExpiryMonthIsRejected(int month) {
-    PostPaymentRequest request = request("2222405343248877", month, 2030, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", month, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("expiryMonth");
   }
 
   @Test
   void expiryInPreviousMonthIsRejected() {
-    PostPaymentRequest request = request("2222405343248877", 10, 2026, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 10, 2026, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("expiryYear");
   }
 
   @Test
   void expiryInCurrentMonthIsAccepted() {
-    PostPaymentRequest request = request("2222405343248877", 11, 2026, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 11, 2026, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(validator.validate(request)).isEmpty();
   }
 
   @Test
   void expiryInNextMonthIsAccepted() {
-    PostPaymentRequest request = request("2222405343248877", 12, 2026, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 12, 2026, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(validator.validate(request)).isEmpty();
   }
 
   @Test
   void expiryInPastYearIsRejected() {
-    PostPaymentRequest request = request("2222405343248877", 12, 2025, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 12, 2025, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("expiryYear");
   }
@@ -105,14 +106,14 @@ class PaymentValidatorTest {
   @ParameterizedTest
   @ValueSource(ints = {0, 26, 202, 20300})
   void yearThatIsNotFourDigitsIsRejected(int year) {
-    PostPaymentRequest request = request("2222405343248877", 4, year, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 4, year, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("expiryYear");
   }
 
   @Test
   void invalidMonthDoesNotAlsoReportExpiryYear() {
-    PostPaymentRequest request = request("2222405343248877", 13, 2020, "GBP", 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 13, 2020, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("expiryMonth");
   }
@@ -121,7 +122,7 @@ class PaymentValidatorTest {
   @NullSource
   @ValueSource(strings = {"", "US", "USDD", "usd", "ABC", "12A"})
   void invalidCurrencyIsRejected(String currency) {
-    PostPaymentRequest request = request("2222405343248877", 4, 2030, currency, 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 4, 2030, currency, BigDecimal.valueOf(100), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("currency");
   }
@@ -129,15 +130,28 @@ class PaymentValidatorTest {
   @ParameterizedTest
   @ValueSource(strings = {"USD", "GBP", "EUR", "JPY", "CNY"})
   void anyIsoCurrencyIsAccepted(String currency) {
-    PostPaymentRequest request = request("2222405343248877", 4, 2030, currency, 100L, "123");
+    PostPaymentRequest request = request("2222405343248877", 4, 2030, currency, BigDecimal.valueOf(100), "123");
 
     assertThat(validator.validate(request)).isEmpty();
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"10.5", "0.01", "1E+30"})
+  void amountMustBeAWholeNumberThatFitsInALong(String amount) {
+    PostPaymentRequest request =
+        request("2222405343248877", 4, 2030, "GBP", new BigDecimal(amount), "123");
+
+    assertThat(validator.validate(request))
+        .extracting(FieldError::field, FieldError::message)
+        .containsExactly(org.assertj.core.groups.Tuple.tuple(
+            "amount", "must be a whole number in the minor currency unit"));
+  }
+
+  @ParameterizedTest
   @ValueSource(longs = {0, -1})
   void amountMustBePositive(long amount) {
-    PostPaymentRequest request = request("2222405343248877", 4, 2030, "GBP", amount, "123");
+    PostPaymentRequest request =
+        request("2222405343248877", 4, 2030, "GBP", BigDecimal.valueOf(amount), "123");
 
     assertThat(failedFields(validator.validate(request))).containsExactly("amount");
   }
@@ -146,7 +160,7 @@ class PaymentValidatorTest {
   @NullSource
   @ValueSource(strings = {"", "12", "12345", "12a", "1 2"})
   void invalidCvvIsRejected(String cvv) {
-    PostPaymentRequest request = request("2222405343248877", 4, 2030, "GBP", 100L, cvv);
+    PostPaymentRequest request = request("2222405343248877", 4, 2030, "GBP", BigDecimal.valueOf(100), cvv);
 
     assertThat(failedFields(validator.validate(request))).containsExactly("cvv");
   }
@@ -154,14 +168,14 @@ class PaymentValidatorTest {
   @ParameterizedTest
   @ValueSource(strings = {"123", "1234", "012"})
   void cvvOfThreeOrFourDigitsIsAccepted(String cvv) {
-    PostPaymentRequest request = request("2222405343248877", 4, 2030, "GBP", 100L, cvv);
+    PostPaymentRequest request = request("2222405343248877", 4, 2030, "GBP", BigDecimal.valueOf(100), cvv);
 
     assertThat(validator.validate(request)).isEmpty();
   }
 
   @Test
   void errorMessagesNeverContainTheSubmittedValues() {
-    PostPaymentRequest request = request("1234abcd", 4, 2030, "GBP", 100L, "99x");
+    PostPaymentRequest request = request("1234abcd", 4, 2030, "GBP", BigDecimal.valueOf(100), "99x");
 
     String messages = validator.validate(request).toString();
 

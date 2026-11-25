@@ -131,11 +131,18 @@ class PaymentGatewayControllerTest {
   }
 
   @Test
-  void amountThatIsNotAnIntegerReturns400() throws Exception {
+  void amountThatIsNotAWholeNumberReturns422() throws Exception {
     String year = String.valueOf(Year.now().getValue() + 2);
 
     post(paymentJson("\"" + CARD_NUMBER + "\"", "4", year, "\"GBP\"", "10.5", "\"123\""))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errors[0].field").value("amount"));
+  }
+
+  @Test
+  void amountThatIsAStringReturns400() throws Exception {
+    String year = String.valueOf(Year.now().getValue() + 2);
+
     post(paymentJson("\"" + CARD_NUMBER + "\"", "4", year, "\"GBP\"", "\"100\"", "\"123\""))
         .andExpect(status().isBadRequest());
 

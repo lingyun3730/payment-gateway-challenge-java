@@ -59,7 +59,7 @@ public class PaymentGatewayService {
         paymentRequest.expiryMonth(),
         paymentRequest.expiryYear(),
         paymentRequest.currency(),
-        paymentRequest.amount());
+        paymentRequest.amount().longValueExact());
     paymentsRepository.add(payment);
 
     LOG.info("Payment {} {}", payment.id(), status);

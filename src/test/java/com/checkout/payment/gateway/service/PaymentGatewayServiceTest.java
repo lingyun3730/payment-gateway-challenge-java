@@ -19,6 +19,7 @@ import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
 import com.checkout.payment.gateway.validation.PaymentValidator;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -37,7 +38,7 @@ class PaymentGatewayServiceTest {
   private PaymentGatewayService service;
 
   private final PostPaymentRequest validRequest =
-      new PostPaymentRequest("2222405343248877", 4, 2030, "GBP", 100L, "123");
+      new PostPaymentRequest("2222405343248877", 4, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
   @BeforeEach
   void setUp() {
@@ -84,7 +85,7 @@ class PaymentGatewayServiceTest {
 
   @Test
   void invalidRequestIsRejectedWithoutCallingTheBank() {
-    PostPaymentRequest invalid = new PostPaymentRequest("123", 13, 2030, "GBP", 100L, "123");
+    PostPaymentRequest invalid = new PostPaymentRequest("123", 13, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThatThrownBy(() -> service.processPayment(invalid))
         .isInstanceOfSatisfying(PaymentRejectedException.class,
@@ -112,7 +113,7 @@ class PaymentGatewayServiceTest {
     PaymentsRepository mockRepository = mock(PaymentsRepository.class);
     PaymentGatewayService serviceWithMockRepository =
         new PaymentGatewayService(mockRepository, new PaymentValidator(CLOCK), bank);
-    PostPaymentRequest invalid = new PostPaymentRequest("123", 4, 2030, "GBP", 100L, "123");
+    PostPaymentRequest invalid = new PostPaymentRequest("123", 4, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThatThrownBy(() -> serviceWithMockRepository.processPayment(invalid))
         .isInstanceOf(PaymentRejectedException.class);

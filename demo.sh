@@ -20,7 +20,7 @@ TITLES=(
   "Rejected: required fields missing -> 422"
   "Rejected: card already expired -> 422"
   "Malformed JSON -> 400"
-  "Amount is not an integer -> 400"
+  "Amount is not a whole number -> 422"
   "Retrieve a payment, only the last four digits are shown -> 200"
   "Retrieve an unknown id -> 404"
   "Id that is not a UUID -> 400"

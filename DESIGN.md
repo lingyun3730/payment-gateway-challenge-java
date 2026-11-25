@@ -7,7 +7,7 @@ acquiring bank (simulator), stores the outcome and returns it. A merchant can fe
 
 | Endpoint | Result |
 | --- | --- |
-| `POST /payment` | `200` Authorized or Declined, `422` Rejected, `400` malformed JSON, `502` bank unavailable |
+| `POST /payment` | `200` Authorized or Declined, `422` Rejected, `400` malformed JSON or wrong type, `502` bank unavailable |
 | `GET /payment/{id}` | `200` payment, `404` unknown id, `400` id is not a UUID |
 
 Flow of `POST /payment`: validate (collect every error) -> call bank -> map the bank answer to
@@ -26,7 +26,7 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 | Declined by the bank is `200` | The request was processed correctly. Declined is a business result, not an error |
 | Full card number and CVV are **never stored, logged or returned**. Only the last four digits are kept | PCI risk. `toString()` of request records is redacted, error messages describe the rule and never quote the submitted value, and the 400 message is fixed text because Jackson's own message can quote the value |
 | `cardNumber` and `cvv` are Strings, `amount` is a `long` in minor units | Leading zeros must survive, and 16 to 19 digits overflow an `int` |
-| Strict JSON: `10.5` and `"100"` for `amount` return 400 | By default Jackson would silently turn `10.5` into `10` |
+| `amount` is read as a number, then must be a whole number: `10.5` returns 422 with field `amount`. A JSON string such as `"100"` returns 400 | By default Jackson would silently turn `10.5` into `10`, which changes the money amount. Rejecting it with a field error is clearer for the merchant |
 | Hand-written validator, no extra dependency | Easy to read, one place for every rule, and it can collect all errors and take an injected `Clock` |
 | Java records for request and response models | Immutable, no boilerplate, supported by Jackson |
 | Bank client behind the `BankClient` interface | The service is tested with a fake bank. The client is tested with `MockRestServiceServer` |

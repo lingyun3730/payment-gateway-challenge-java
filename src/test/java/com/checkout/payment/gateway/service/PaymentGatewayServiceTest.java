@@ -108,6 +108,19 @@ class PaymentGatewayServiceTest {
   }
 
   @Test
+  void rejectedPaymentIsNotStored() {
+    PaymentsRepository mockRepository = mock(PaymentsRepository.class);
+    PaymentGatewayService serviceWithMockRepository =
+        new PaymentGatewayService(mockRepository, new PaymentValidator(CLOCK), bank);
+    PostPaymentRequest invalid = new PostPaymentRequest("123", 4, 2030, "GBP", 100L, "123");
+
+    assertThatThrownBy(() -> serviceWithMockRepository.processPayment(invalid))
+        .isInstanceOf(PaymentRejectedException.class);
+
+    verifyNoInteractions(mockRepository);
+  }
+
+  @Test
   void storedPaymentNeverContainsFullCardNumberOrCvv() {
     when(bank.authorize(any())).thenReturn(new BankResponse(true, "code"));
 

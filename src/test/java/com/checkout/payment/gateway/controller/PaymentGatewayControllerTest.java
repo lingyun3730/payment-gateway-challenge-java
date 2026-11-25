@@ -3,6 +3,7 @@ package com.checkout.payment.gateway.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -139,6 +140,23 @@ class PaymentGatewayControllerTest {
         .andExpect(status().isBadRequest());
 
     verifyNoInteractions(bankClient);
+  }
+
+  @Test
+  void paymentIdThatIsNotAUuidReturns400() throws Exception {
+    mvc.perform(MockMvcRequestBuilders.get("/payment/not-a-uuid"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // Documents a known limitation: there is no idempotency key, so a retry creates a new payment.
+  @Test
+  void sendingTheSameRequestTwiceCreatesTwoPayments() throws Exception {
+    when(bankClient.authorize(any())).thenReturn(new BankResponse(true, "code"));
+
+    String first = post(validPaymentJson()).andReturn().getResponse().getContentAsString();
+    String second = post(validPaymentJson()).andReturn().getResponse().getContentAsString();
+
+    assertNotEquals(JsonPath.<String>read(first, "$.id"), JsonPath.<String>read(second, "$.id"));
   }
 
   @Test

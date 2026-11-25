@@ -19,6 +19,9 @@ imposters/ - contains the bank simulator configuration. Don't change this
 docker-compose.yml - configures the bank simulator
 
 
+## Design considerations and assumptions
+See [DESIGN.md](DESIGN.md).
+
 ## API Documentation
 For documentation openAPI is included, and it can be found under the following url: **http://localhost:8090/swagger-ui/index.html**
 

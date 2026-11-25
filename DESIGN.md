@@ -69,14 +69,6 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 - JSON uses camelCase, matching the sample code. The bank simulator uses its own snake_case, which is
   handled in `BankRequest` and `BankResponse`.
 
-## Security notes
-
-- The full card number only exists in memory during a request and in the call to the bank.
-- Errors never repeat what the caller submitted.
-- Not in scope here, but needed in production: merchant authentication (API key checked at the
-  gateway), authorisation (a merchant can only read its own payments), TLS, rate limiting, and a
-  card vault or tokenisation so the gateway does not handle raw card numbers.
-
 ## Not done on purpose (kept simple, as the brief asks)
 
 | Missing | What I would do in production |
@@ -84,9 +76,37 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 | **Idempotency**. A retry creates a second payment (a test documents this) | `Idempotency-Key` header, stored with a unique constraint so concurrent retries create one payment |
 | **Bank timeout leaves the result unknown**. The gateway returns 502 and keeps nothing, so the merchant cannot tell whether the bank charged the card | Save the payment as `PENDING` before calling the bank, query the bank by payment id on timeout, and notify the merchant by webhook |
 | In-memory storage | Database with an index on the payment id, and a unique key for idempotency |
-| Authentication and per-merchant access | API key per merchant, lookups filtered by merchant id |
+| Authentication, per-merchant access, rate limiting, TLS | See "Security considerations and known gaps" below |
 | Retries, circuit breaker, metrics, tracing | Retry only safe calls, circuit breaker per bank, request id in logs, alerts on bank error rate |
 | Currency-specific minor units (JPY has none) | Currency table with exponent |
+
+## Security considerations and known gaps
+
+**What the service already does**
+- The full card number and CVV are never stored, logged or returned. Only the last four digits are kept.
+  The full number only exists in memory during a request and in the call to the bank.
+- `toString()` of the request is redacted, error messages never repeat the submitted values, and
+  the 400 message is fixed text.
+- All input is validated before the bank is called, and the service uses no SQL.
+
+**What is not done, because the brief did not ask for it, and how I would fix it**
+
+| Gap | Risk | Fix |
+| --- | --- | --- |
+| **Authentication** | Anyone who can reach the API can create payments | One API key per merchant in the `Authorization` header. A filter checks it before the controller. Only a hash of the key is stored, and keys can be rotated (two active keys at once) and revoked |
+| **Authorization (IDOR)** | Any caller who knows a payment id can read it. A random UUID is not access control | Store the merchant id with each payment and query by payment id **and** merchant id. Return 404 for other merchants' payments. On `POST`, take the merchant id from the authenticated key, never from the request body |
+| **Idempotency and replay** | A retry creates a second payment | `Idempotency-Key` header with a unique constraint, so the same key returns the first result |
+| **Transport security** | The app speaks plain HTTP | Terminate TLS at the load balancer or API gateway, and use TLS to the bank |
+| **Rate limiting and abuse** | A stolen key or a bot can flood the API or test stolen cards | Rate limit per merchant, alert on many declines, limit the request size |
+| **Stolen API keys** | A leaked key can create payments | HTTPS only, never log keys, scopes, IP allow-list, per-key limits, expiry, usage monitoring, instant revoke. For stronger security, request signing (HMAC) so the secret is never sent |
+| **Card data at rest** | A database leak would expose card data (PCI scope) | Keep only the last four digits. If full numbers are ever needed, use a separate PCI-compliant vault and give the gateway a token |
+| **Secrets** | The bank URL is in `application.properties`, and later there will be credentials | Load secrets from a secret manager or environment variables, never from Git |
+| **Logging and monitoring** | No automated check that logs stay free of card data, no request id, no alerts | A test that fails if a card number appears in logs, a request id on every log line, alerts on bank error rate |
+| **Swagger UI** | It shows the API to everyone | Disable it in production or keep it on the internal network |
+| **Dependencies** | A library with a known vulnerability | Dependency scan in CI |
+
+The order I would fix them in: authentication and per-merchant access first, then idempotency, then
+rate limiting and monitoring.
 
 ## Testing
 

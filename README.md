@@ -16,7 +16,7 @@ imposters/ - contains the bank simulator configuration. Don't change this
 
 .editorconfig - don't change this. It ensures a consistent set of rules for submissions when reformatting code
 
-docker-compose.yml - configures the bank simulator
+docker-compose.yml - starts the bank simulator and the gateway
 
 
 ## Design considerations and assumptions

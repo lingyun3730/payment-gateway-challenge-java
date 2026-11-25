@@ -162,7 +162,15 @@ docker-compose up -d bank_simulator
 ./gradlew bootRun        # gateway on :8090, Swagger UI at /swagger-ui/index.html
 ```
 
-Requires JDK 17. The bank URL is `bank.url` in `application.properties`.
-With the gateway running, open `/swagger-ui/index.html`, try `POST /payment` and pick one of the
-prepared examples (Authorized, Declined, Rejected, bank unavailable, malformed JSON) from the
-"Examples" drop-down.
+Requires Docker, and JDK 17 for the local option. The bank URL is `bank.url` in
+`application.properties` (override with the `BANK_URL` environment variable).
+
+**Try it:** open http://localhost:8090/swagger-ui/index.html, expand `POST /payment` and pick an
+example from the "Examples" drop-down: Authorized, Declined, several invalid fields, missing fields,
+expired card, amount not a whole number, malformed JSON, bank unavailable. Then copy the returned `id`
+into `GET /payment/{id}`.
+
+**Check the service:** `curl http://localhost:8090/actuator/health` and
+`curl http://localhost:8090/actuator/metrics/payments.processed`.
+
+**Run the tests:** `./gradlew test` (83 tests, no Docker needed, the bank is mocked).

@@ -13,3 +13,14 @@ services:
         source: ./imposters
         target: /imposters
       
+
+  gateway:
+    container_name: payment_gateway
+    build: .
+    ports:
+      - "8090:8090"
+    environment:
+      # Inside the compose network the bank is reached by its service name, not localhost.
+      BANK_URL: http://bank_simulator:8080/payments
+    depends_on:
+      - bank_simulator

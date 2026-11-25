@@ -1,18 +1,20 @@
 package com.checkout.payment.gateway.repository;
 
 import com.checkout.payment.gateway.model.PostPaymentResponse;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class PaymentsRepository {
 
-  private final HashMap<UUID, PostPaymentResponse> payments = new HashMap<>();
+  // Concurrent because several payment requests can be processed at the same time.
+  private final Map<UUID, PostPaymentResponse> payments = new ConcurrentHashMap<>();
 
   public void add(PostPaymentResponse payment) {
-    payments.put(payment.getId(), payment);
+    payments.put(payment.id(), payment);
   }
 
   public Optional<PostPaymentResponse> get(UUID id) {

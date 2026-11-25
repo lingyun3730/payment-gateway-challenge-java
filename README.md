@@ -16,8 +16,11 @@ imposters/ - contains the bank simulator configuration. Don't change this
 
 .editorconfig - don't change this. It ensures a consistent set of rules for submissions when reformatting code
 
-docker-compose.yml - configures the bank simulator
+docker-compose.yml - starts the bank simulator and the gateway
 
+
+## Design considerations and assumptions
+See [DESIGN.md](DESIGN.md).
 
 ## API Documentation
 For documentation openAPI is included, and it can be found under the following url: **http://localhost:8090/swagger-ui/index.html**

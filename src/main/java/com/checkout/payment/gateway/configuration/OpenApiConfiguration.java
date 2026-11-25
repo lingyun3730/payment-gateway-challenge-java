@@ -50,14 +50,14 @@ public class OpenApiConfiguration {
     Map<String, Example> examples = new LinkedHashMap<>();
     examples.put("1. Authorized (200)", load(objectMapper, "1-authorized.json"));
     examples.put("2. Declined (200)", load(objectMapper, "2-declined.json"));
-    examples.put("3. Bank unavailable (502)", load(objectMapper, "3-bank-unavailable.json"));
-    examples.put("4. Rejected: several invalid fields (422)",
-        load(objectMapper, "4-several-invalid-fields.json"));
-    examples.put("5. Rejected: fields missing (422)", load(objectMapper, "5-missing-fields.json"));
-    examples.put("6. Rejected: card expired (422)", load(objectMapper, "6-expired-card.json"));
+    examples.put("3. Rejected: several invalid fields (422)",
+        load(objectMapper, "3-several-invalid-fields.json"));
+    examples.put("4. Rejected: fields missing (422)", load(objectMapper, "4-missing-fields.json"));
+    examples.put("5. Rejected: card expired (422)", load(objectMapper, "5-expired-card.json"));
+    examples.put("6. Rejected: amount is not a whole number (422)",
+        load(objectMapper, "6-amount-not-whole-number.json"));
     examples.put("7. Malformed JSON (400)", load(objectMapper, "7-malformed-json.json"));
-    examples.put("8. Rejected: amount is not a whole number (422)",
-        load(objectMapper, "8-amount-not-whole-number.json"));
+    examples.put("8. Bank unavailable (502)", load(objectMapper, "8-bank-unavailable.json"));
     return examples;
   }
 

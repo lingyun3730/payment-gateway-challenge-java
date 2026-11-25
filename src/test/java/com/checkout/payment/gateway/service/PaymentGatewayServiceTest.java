@@ -19,6 +19,8 @@ import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
 import com.checkout.payment.gateway.validation.PaymentValidator;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -35,6 +37,7 @@ class PaymentGatewayServiceTest {
 
   private final BankClient bank = mock(BankClient.class);
   private PaymentsRepository repository;
+  private final MeterRegistry meters = new SimpleMeterRegistry();
   private PaymentGatewayService service;
 
   private final PostPaymentRequest validRequest =
@@ -43,7 +46,7 @@ class PaymentGatewayServiceTest {
   @BeforeEach
   void setUp() {
     repository = new PaymentsRepository();
-    service = new PaymentGatewayService(repository, new PaymentValidator(CLOCK), bank);
+    service = new PaymentGatewayService(repository, new PaymentValidator(CLOCK), bank, meters);
   }
 
   @Test
@@ -59,6 +62,7 @@ class PaymentGatewayServiceTest {
     assertThat(payment.currency()).isEqualTo("GBP");
     assertThat(payment.amount()).isEqualTo(100L);
     assertThat(repository.get(payment.id())).contains(payment);
+    assertThat(count("authorized")).isEqualTo(1);
   }
 
   @Test
@@ -69,6 +73,7 @@ class PaymentGatewayServiceTest {
 
     assertThat(payment.status()).isEqualTo(PaymentStatus.DECLINED);
     assertThat(repository.get(payment.id())).contains(payment);
+    assertThat(count("declined")).isEqualTo(1);
   }
 
   @Test
@@ -93,6 +98,7 @@ class PaymentGatewayServiceTest {
                 .containsExactly("cardNumber", "expiryMonth"));
 
     verifyNoInteractions(bank);
+    assertThat(count("rejected")).isEqualTo(1);
   }
 
   @Test
@@ -100,19 +106,20 @@ class PaymentGatewayServiceTest {
     when(bank.authorize(any())).thenThrow(new BankUnavailableException("down"));
     PaymentsRepository spyRepository = mock(PaymentsRepository.class);
     PaymentGatewayService serviceWithMockRepository =
-        new PaymentGatewayService(spyRepository, new PaymentValidator(CLOCK), bank);
+        new PaymentGatewayService(spyRepository, new PaymentValidator(CLOCK), bank, meters);
 
     assertThatThrownBy(() -> serviceWithMockRepository.processPayment(validRequest))
         .isInstanceOf(BankUnavailableException.class);
 
     verifyNoInteractions(spyRepository);
+    assertThat(count("bank_unavailable")).isEqualTo(1);
   }
 
   @Test
   void rejectedPaymentIsNotStored() {
     PaymentsRepository mockRepository = mock(PaymentsRepository.class);
     PaymentGatewayService serviceWithMockRepository =
-        new PaymentGatewayService(mockRepository, new PaymentValidator(CLOCK), bank);
+        new PaymentGatewayService(mockRepository, new PaymentValidator(CLOCK), bank, meters);
     PostPaymentRequest invalid = new PostPaymentRequest("123", 4, 2030, "GBP", BigDecimal.valueOf(100), "123");
 
     assertThatThrownBy(() -> serviceWithMockRepository.processPayment(invalid))
@@ -134,5 +141,9 @@ class PaymentGatewayServiceTest {
   void unknownPaymentIdIsNotFound() {
     assertThatThrownBy(() -> service.getPaymentById(UUID.randomUUID()))
         .isInstanceOf(EventProcessingException.class);
+  }
+
+  private double count(String outcome) {
+    return meters.counter("payments.processed", "outcome", outcome).count();
   }
 }

@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -147,6 +148,42 @@ class PaymentGatewayControllerTest {
         .andExpect(status().isBadRequest());
 
     verifyNoInteractions(bankClient);
+  }
+
+  @Test
+  void everyResponseCarriesARequestId() throws Exception {
+    when(bankClient.authorize(any())).thenReturn(new BankResponse(true, "code"));
+    String generated = post(validPaymentJson()).andReturn().getResponse().getHeader("X-Request-Id");
+    assertNotEquals(null, generated);
+    assertNotEquals("", generated);
+
+    post(validPaymentJson()).andExpect(header().exists("X-Request-Id"));
+  }
+
+  @Test
+  void safeRequestIdFromTheCallerIsEchoedAndUnsafeOneIsReplaced() throws Exception {
+    mvc.perform(MockMvcRequestBuilders.get("/payment/" + UUID.randomUUID())
+            .header("X-Request-Id", "abc-123"))
+        .andExpect(header().string("X-Request-Id", "abc-123"));
+
+    MvcResult result = mvc.perform(MockMvcRequestBuilders.get("/payment/" + UUID.randomUUID())
+            .header("X-Request-Id", "bad id\twith spaces"))
+        .andReturn();
+    assertNotEquals("bad id\twith spaces", result.getResponse().getHeader("X-Request-Id"));
+  }
+
+  @Test
+  void healthAndPaymentMetricEndpointsAreExposed() throws Exception {
+    mvc.perform(MockMvcRequestBuilders.get("/actuator/health"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UP"));
+    mvc.perform(MockMvcRequestBuilders.get("/actuator/health/readiness"))
+        .andExpect(status().isOk());
+
+    when(bankClient.authorize(any())).thenReturn(new BankResponse(true, "code"));
+    post(validPaymentJson()).andExpect(status().isOk());
+    mvc.perform(MockMvcRequestBuilders.get("/actuator/metrics/payments.processed"))
+        .andExpect(status().isOk());
   }
 
   @Test

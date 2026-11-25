@@ -10,6 +10,25 @@ acquiring bank (simulator), stores the outcome and returns it. A merchant can fe
 | `POST /payment` | `200` Authorized or Declined, `422` Rejected, `400` malformed JSON or wrong type, `502` bank unavailable |
 | `GET /payment/{id}` | `200` payment, `404` unknown id, `400` id is not a UUID |
 
+### Request flow
+```mermaid
+flowchart LR
+    M([Merchant]) -->|POST /payment| C[Controller]
+    C --> S[PaymentGatewayService]
+    S --> V{PaymentValidator}
+    V -->|invalid| R422[422 Rejected<br/>all field errors<br/>bank not called]
+    V -->|valid| B[BankClient]
+    B -->|HTTP| SIM[(Bank simulator)]
+    SIM -->|authorized / declined| ST[(PaymentsRepository<br/>last four digits only)]
+    ST --> OK[200 Authorized or Declined<br/>with payment id]
+    SIM -.->|503 or timeout| R502[502 Bank unavailable<br/>nothing stored]
+    C -.->|unreadable JSON or wrong type| R400[400 Bad request]
+    M -->|GET /payment/id| C
+    C --> S
+    S --> ST
+```
+Solid arrows are the normal path, dotted arrows are failures.
+
 Flow of `POST /payment`: validate (collect every error) -> call bank -> map the bank answer to
 Authorized or Declined -> store (last four digits only) -> respond.
 

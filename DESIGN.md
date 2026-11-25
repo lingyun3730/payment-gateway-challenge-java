@@ -71,7 +71,7 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 
 ## Testing
 
-75 automated tests (`./gradlew test`):
+79 automated tests (`./gradlew test`):
 
 - **Validator**: every rule, boundaries (length 14 and 19, previous, current and next month),
   all errors at once, error text never contains submitted values. The clock is fixed.

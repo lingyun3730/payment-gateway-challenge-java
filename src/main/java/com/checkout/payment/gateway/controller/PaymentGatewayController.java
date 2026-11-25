@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +49,17 @@ public class PaymentGatewayController {
           @ExampleObject(name = "8. Amount is not an integer (400)",
               value = PaymentExamples.AMOUNT_NOT_AN_INTEGER)
       }))
+  @ApiResponses({
+      @ApiResponse(responseCode = "200",
+          description = "Bank answered: status is Authorized or Declined"),
+      @ApiResponse(responseCode = "400", description = "Malformed JSON or wrong field type",
+          content = @Content),
+      @ApiResponse(responseCode = "422",
+          description = "Rejected: invalid card details, all errors listed (bank not called)",
+          content = @Content),
+      @ApiResponse(responseCode = "502", description = "Acquiring bank unavailable",
+          content = @Content)
+  })
   @PostMapping("/payment")
   public ResponseEntity<PostPaymentResponse> processPayment(
       @RequestBody PostPaymentRequest paymentRequest) {

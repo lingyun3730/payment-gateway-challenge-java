@@ -1,22 +1,39 @@
 #!/usr/bin/env bash
-# Walks through every outcome of the gateway. Start the bank simulator and the gateway first:
+# Step-by-step demo of the gateway. Start the bank simulator and the gateway first:
 #   docker-compose up -d
 #   ./gradlew bootRun
+#
+# ./demo.sh          run all steps, pause before each one (press Enter to continue)
+# ./demo.sh 4        run only step 4
+# ./demo.sh list     list the steps
 set -u
 
 BASE_URL="${BASE_URL:-http://localhost:8090}"
 YEAR=$(( $(date +%Y) + 2 ))
+LAST_BODY=""
 
-if ! curl -s -o /dev/null "$BASE_URL/v3/api-docs"; then
-  echo "Gateway is not reachable at $BASE_URL. Start it with ./gradlew bootRun"
-  exit 1
-fi
+TITLES=(
+  "Authorized: card ends in an odd digit -> 200"
+  "Declined: card ends in an even digit -> 200"
+  "Bank unavailable: card ends in 0 -> 502, nothing stored"
+  "Rejected: several invalid fields, all reported at once -> 422"
+  "Rejected: required fields missing -> 422"
+  "Rejected: card already expired -> 422"
+  "Malformed JSON -> 400"
+  "Amount is not an integer -> 400"
+  "Retrieve a payment, only the last four digits are shown -> 200"
+  "Retrieve an unknown id -> 404"
+  "Id that is not a UUID -> 400"
+)
 
-# Sends a request, prints what was sent and what came back. The body goes to LAST_BODY.
+payment() {
+  # card number, month, year, currency, amount, cvv
+  echo "{\"cardNumber\":\"$1\",\"expiryMonth\":$2,\"expiryYear\":$3,\"currency\":\"$4\",\"amount\":$5,\"cvv\":\"$6\"}"
+}
+
+# Sends a request and prints it with the response. The response body is kept in LAST_BODY.
 call() {
-  local title="$1" method="$2" path="$3" body="${4:-}"
-  echo
-  echo "=== $title"
+  local method="$1" path="$2" body="${3:-}" response
   echo "$method $path"
   if [ -n "$body" ]; then
     echo "request:  $body"
@@ -30,36 +47,63 @@ call() {
   echo "status:   $(echo "$response" | tail -n 1)"
 }
 
-payment() {
-  # card number, month, year, currency, amount, cvv
-  echo "{\"cardNumber\":\"$1\",\"expiryMonth\":$2,\"expiryYear\":$3,\"currency\":\"$4\",\"amount\":$5,\"cvv\":\"$6\"}"
+# Step 9 needs an existing payment, so create one quietly if step 1 was not run.
+create_authorized_payment_id() {
+  curl -s -X POST "$BASE_URL/payment" -H 'Content-Type: application/json' \
+    -d "$(payment 2222405343248877 4 "$YEAR" GBP 100 123)" | grep -o '"id":"[^"]*"' | cut -d'"' -f4
 }
 
-call "1. Authorized (card ends in an odd digit) -> 200" POST /payment \
-  "$(payment 2222405343248877 4 "$YEAR" GBP 100 123)"
-AUTHORIZED_ID=$(echo "$LAST_BODY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+run_step() {
+  case "$1" in
+    1) call POST /payment "$(payment 2222405343248877 4 "$YEAR" GBP 100 123)"
+       PAYMENT_ID=$(echo "$LAST_BODY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4) ;;
+    2) call POST /payment "$(payment 2222405343248878 4 "$YEAR" USD 2500 123)" ;;
+    3) call POST /payment "$(payment 2222405343248870 4 "$YEAR" EUR 100 123)" ;;
+    4) call POST /payment "$(payment 12 13 2020 GBP 0 1)" ;;
+    5) call POST /payment '{}' ;;
+    6) call POST /payment "$(payment 2222405343248877 1 2020 GBP 100 123)" ;;
+    7) call POST /payment '{oops' ;;
+    8) call POST /payment "{\"cardNumber\":\"2222405343248877\",\"expiryMonth\":4,\"expiryYear\":$YEAR,\"currency\":\"GBP\",\"amount\":10.5,\"cvv\":\"123\"}" ;;
+    9) PAYMENT_ID="${PAYMENT_ID:-$(create_authorized_payment_id)}"
+       call GET "/payment/$PAYMENT_ID" ;;
+    10) call GET /payment/00000000-0000-0000-0000-000000000000 ;;
+    11) call GET /payment/not-a-uuid ;;
+  esac
+}
 
-call "2. Declined (card ends in an even digit) -> 200" POST /payment \
-  "$(payment 2222405343248878 4 "$YEAR" USD 2500 123)"
+list_steps() {
+  for i in "${!TITLES[@]}"; do
+    echo "$((i + 1)). ${TITLES[$i]}"
+  done
+}
 
-call "3. Bank unavailable (card ends in 0) -> 502, nothing stored" POST /payment \
-  "$(payment 2222405343248870 4 "$YEAR" EUR 100 123)"
+if [ "${1:-}" = "list" ]; then
+  list_steps
+  exit 0
+fi
 
-call "4. Rejected: several invalid fields, all reported at once -> 422" POST /payment \
-  "$(payment 12 13 2020 GBP 0 1)"
+if ! curl -s -o /dev/null "$BASE_URL/v3/api-docs"; then
+  echo "Gateway is not reachable at $BASE_URL. Start it with ./gradlew bootRun"
+  exit 1
+fi
 
-call "5. Rejected: required fields missing -> 422" POST /payment '{}'
+PAYMENT_ID=""
 
-call "6. Rejected: card already expired -> 422" POST /payment \
-  "$(payment 2222405343248877 1 2020 GBP 100 123)"
+if [ -n "${1:-}" ]; then
+  if [ "$1" -lt 1 ] || [ "$1" -gt "${#TITLES[@]}" ] 2>/dev/null; then
+    echo "Unknown step. Use ./demo.sh list"
+    exit 1
+  fi
+  echo "=== $1. ${TITLES[$(($1 - 1))]}"
+  run_step "$1"
+  exit 0
+fi
 
-call "7. Malformed JSON -> 400" POST /payment '{oops'
-
-call "8. Amount is not an integer -> 400" POST /payment \
-  "{\"cardNumber\":\"2222405343248877\",\"expiryMonth\":4,\"expiryYear\":$YEAR,\"currency\":\"GBP\",\"amount\":10.5,\"cvv\":\"123\"}"
-
-call "9. Retrieve the authorized payment (only last four digits) -> 200" GET "/payment/$AUTHORIZED_ID"
-
-call "10. Retrieve an unknown id -> 404" GET /payment/00000000-0000-0000-0000-000000000000
-
-call "11. Id that is not a UUID -> 400" GET /payment/not-a-uuid
+for i in "${!TITLES[@]}"; do
+  step=$((i + 1))
+  echo
+  read -r -p "[Enter] to run step $step of ${#TITLES[@]}: ${TITLES[$i]} " _
+  run_step "$step"
+done
+echo
+echo "Done."

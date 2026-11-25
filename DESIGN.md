@@ -94,5 +94,6 @@ docker-compose up -d     # bank simulator on :8080
 ```
 
 Requires JDK 17. The bank URL is `bank.url` in `application.properties`.
-With the gateway running, `./demo.sh` calls every outcome in turn (Authorized, Declined, Rejected,
-bank unavailable, malformed JSON, GET) and prints each request and response.
+With the gateway running, `./demo.sh` walks through every outcome one step at a time (press Enter
+for the next step): Authorized, Declined, Rejected, bank unavailable, malformed JSON and GET.
+`./demo.sh list` shows the steps and `./demo.sh 4` runs a single one.

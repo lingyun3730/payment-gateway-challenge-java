@@ -77,8 +77,30 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 | **Bank timeout leaves the result unknown**. The gateway returns 502 and keeps nothing, so the merchant cannot tell whether the bank charged the card | Save the payment as `PENDING` before calling the bank, query the bank by payment id on timeout, and notify the merchant by webhook |
 | In-memory storage | Database with an index on the payment id, and a unique key for idempotency |
 | Authentication, per-merchant access, rate limiting, TLS | See "Security considerations and known gaps" below |
-| Retries, circuit breaker, metrics, tracing | Retry only safe calls, circuit breaker per bank, request id in logs, alerts on bank error rate |
+| Retries, circuit breaker, tracing, alerts | Retry only safe calls, circuit breaker per bank, distributed tracing (OpenTelemetry), alert on bank error rate and latency |
 | Currency-specific minor units (JPY has none) | Currency table with exponent |
+
+## Observability
+
+- **Request id**: every request gets an `X-Request-Id`, returned in the response and printed on every
+  log line (`[requestId=...]`). A caller's id is reused only if it is safe (letters, digits, `-`,
+  max 64), otherwise a new UUID is generated, so nobody can inject text into the logs.
+- **Health**: `/actuator/health`, with liveness and readiness probes for the orchestrator.
+- **Metrics**: `/actuator/metrics` has the standard HTTP metrics (rate, errors, latency) and a business
+  counter `payments.processed` tagged by outcome: `authorized`, `declined`, `rejected`, `bank_unavailable`.
+- **Logs never contain card data**: a rejected request logs only the names of the invalid fields.
+- **Not done**: distributed tracing, a metrics backend (Prometheus) and alerts. In production I would alert
+  on the `bank_unavailable` rate and on p99 latency.
+
+## Packaging and hosting
+
+- `./gradlew bootJar` builds one executable jar.
+- The `Dockerfile` is multi-stage: build with the JDK, run on a JRE image as a non-root user.
+- `docker-compose up --build` starts the gateway and the bank simulator together. The bank URL is set
+  with the `BANK_URL` environment variable, so the same image runs in any environment.
+- Graceful shutdown is on, so in-flight requests finish before the pod stops.
+- The in-memory store makes the service stateful. Before running more than one instance, the
+  repository must move to a database.
 
 ## Security considerations and known gaps
 
@@ -110,7 +132,7 @@ rate limiting and monitoring.
 
 ## Testing
 
-79 automated tests (`./gradlew test`):
+83 automated tests (`./gradlew test`):
 
 - **Validator**: every rule, boundaries (length 14 and 19, previous, current and next month),
   all errors at once, error text never contains submitted values. The clock is fixed.
@@ -126,8 +148,16 @@ ending in 0) and the application log for leaked card data.
 
 ## How to run
 
+Everything in containers (gateway on :8090, bank simulator on :8080):
+
 ```bash
-docker-compose up -d     # bank simulator on :8080
+docker-compose up --build
+```
+
+Or run the gateway locally:
+
+```bash
+docker-compose up -d bank_simulator
 ./gradlew test
 ./gradlew bootRun        # gateway on :8090, Swagger UI at /swagger-ui/index.html
 ```

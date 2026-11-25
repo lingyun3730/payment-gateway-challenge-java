@@ -85,9 +85,16 @@ tests use a fake), `repository` (in-memory), `exception` (mapped to HTTP in one 
 - **Request id**: every request gets an `X-Request-Id`, returned in the response and printed on every
   log line (`[requestId=...]`). A caller's id is reused only if it is safe (letters, digits, `-`,
   max 64), otherwise a new UUID is generated, so nobody can inject text into the logs.
-- **Health**: `/actuator/health`, with liveness and readiness probes for the orchestrator.
-- **Metrics**: `/actuator/metrics` has the standard HTTP metrics (rate, errors, latency) and a business
-  counter `payments.processed` tagged by outcome: `authorized`, `declined`, `rejected`, `bank_unavailable`.
+- **Health**: [`/actuator/health`](http://localhost:8090/actuator/health), with liveness and readiness probes
+  for the orchestrator.
+- **Metrics**: [`/actuator/metrics`](http://localhost:8090/actuator/metrics) lists them (links work when the
+  gateway is running on :8090). The standard HTTP metrics (rate, errors, latency) are in
+  [`http.server.requests`](http://localhost:8090/actuator/metrics/http.server.requests). The business counter
+  [`payments.processed`](http://localhost:8090/actuator/metrics/payments.processed) is tagged by outcome:
+  [`authorized`](http://localhost:8090/actuator/metrics/payments.processed?tag=outcome:authorized),
+  [`declined`](http://localhost:8090/actuator/metrics/payments.processed?tag=outcome:declined),
+  [`rejected`](http://localhost:8090/actuator/metrics/payments.processed?tag=outcome:rejected),
+  [`bank_unavailable`](http://localhost:8090/actuator/metrics/payments.processed?tag=outcome:bank_unavailable).
 - **Logs never contain card data**: a rejected request logs only the names of the invalid fields.
 - **Not done**: distributed tracing, a metrics backend (Prometheus) and alerts.
   In production I would add metrics for the bank call (latency, timeouts, errors) and JVM resources, and alert on
